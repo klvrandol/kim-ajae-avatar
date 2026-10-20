@@ -17,6 +17,16 @@ export const reactionNames = {
   facepalm: "얼굴 가리기",
 };
 export const unavailableReactions = new Set(Object.keys(reactionNames));
+// Existing facial textures remain in their source coordinates. These affine maps
+// register each small region to the seated original, without touching hands or props.
+export const seatedFaceRegistration = {
+  mouth: [0.902527, -0.005892, 0.012531, 0.908202, 31.767902, 17.744303],
+  leftEye: [0.910888, -0.007072, 0.01595, 0.906931, 25.340935, 20.645081],
+  rightEye: [0.924868, -0.015335, 0.011947, 0.916835, 19.872063, 20.844062],
+  leftBrow: [0.933044, -0.01394, 0.031617, 0.952566, 10.74503, 6.921513],
+  rightBrow: [0.909239, -0.030333, 0.005732, 0.930016, 31.200042, 25.475858],
+  laughMouth: [0.902527, -0.005892, 0.012531, 0.908202, 31.767902, 17.744303],
+};
 const W = 1086,
   H = 1448;
 const regions = {
@@ -106,7 +116,7 @@ export function createAvatar(mount) {
   canvas.setAttribute("role", "img");
   canvas.setAttribute(
     "aria-label",
-    "원본 김씨 아재: 검정 뿔테안경과 회색 삼선 츄리닝, 팔짱 낀 모습",
+    "원본 김씨 아재: 검정 뿔테안경과 회색 삼선 츄리닝, 책상 앞에서 키보드와 마우스를 잡고 앉은 모습",
   );
   mount.replaceChildren(canvas);
   const ctx = canvas.getContext("2d", { alpha: true });
@@ -166,7 +176,10 @@ export function createAvatar(mount) {
   }
   function drawPatch(image, key, small = false) {
     const [x, y] = regions[key].rect;
+    ctx.save();
+    ctx.transform(...seatedFaceRegistration[key]);
     ctx.drawImage(patch(image, key, small), x, y);
+    ctx.restore();
   }
   function draw() {
     if (!original || disposed) return;
@@ -227,7 +240,7 @@ export function createAvatar(mount) {
   );
   const ready = Promise.all([
     ...expressionLoads,
-    loadImage("kim-ajae-original.png").then((image) => {
+    loadImage("kim-ajae-seated-original.png").then((image) => {
       original = image;
       draw();
     }),

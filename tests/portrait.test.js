@@ -17,6 +17,17 @@ test("approved PNG stays byte identical, RGBA, and is copied unchanged into Page
     "docs/assets/kim-ajae-original.png",
   ])
     assert.equal(digest(await readFile(new URL(path, root))), digest(source));
+  const seated = await readFile(
+    new URL("kim-ajae-seated-original.png.png", root),
+  );
+  assert.equal(seated.readUInt32BE(16), 1086);
+  assert.equal(seated.readUInt32BE(20), 1448);
+  assert.equal(seated[25], 6);
+  for (const path of [
+    "public/assets/kim-ajae-seated-original.png",
+    "docs/assets/kim-ajae-seated-original.png",
+  ])
+    assert.equal(digest(await readFile(new URL(path, root))), digest(seated));
   for (const file of await readdir(new URL("public/assets/", root)))
     assert.equal(
       digest(await readFile(new URL("public/assets/" + file, root))),
