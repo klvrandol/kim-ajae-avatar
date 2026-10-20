@@ -14,6 +14,7 @@ const expressions = [
   "focus",
   "exhale",
 ];
+const reactionDurations = { slam: 1200, coffee: 2000 };
 const reactions = ["slam", "coffee", "gamepad", "cheer", "facepalm"];
 const server = http.createServer(async (req, res) => {
   const url = new URL(req.url, "http://localhost");
@@ -45,8 +46,17 @@ const server = http.createServer(async (req, res) => {
         next.reaction !== undefined &&
         (next.reaction === null || reactions.includes(next.reaction))
       ) {
-        state.reaction = next.reaction;
-        state.reactionAt = Date.now();
+        const currentActive =
+          Date.now() - state.reactionAt <
+          (reactionDurations[state.reaction] || 0);
+        const blocked =
+          next.reaction !== null &&
+          currentActive &&
+          (state.reaction === "coffee" || next.reaction === "coffee");
+        if (!blocked) {
+          state.reaction = next.reaction;
+          state.reactionAt = Date.now();
+        }
       }
       for (const key of ["mouth", "level"])
         if (Number.isFinite(next[key]))

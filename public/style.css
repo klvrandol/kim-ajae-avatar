@@ -4,4 +4,4 @@
 /* Approved portrait: preserve image aspect ratio and keep all face parts registered. */
 #avatar-mount{max-width:480px;margin:10px auto 65px;padding:0 15px}.portrait-avatar{height:auto;width:133.333333%;margin-left:-16.666667%;max-width:none;aspect-ratio:1;animation:portrait-breathe 5.5s ease-in-out infinite;transform-origin:50% 100%}.overlay #overlay-stage .portrait-avatar{width:min(100vh,133.333333vw);height:min(100vh,133.333333vw);margin-left:0;max-width:none;aspect-ratio:1}.expression-grid{grid-template-columns:repeat(4,1fr)}.reaction-grid button:disabled{cursor:not-allowed;opacity:.52}.reaction-grid button:disabled:hover{transform:none}.stage-caption{bottom:15px}@keyframes portrait-breathe{50%{transform:translateY(1px) scaleY(.999)}}@media(prefers-reduced-motion:reduce){.portrait-avatar{animation:none}}@media(max-width:850px){#avatar-mount{max-width:380px}}
 
-.portrait-avatar[data-reaction="slam"]{animation:none}
+.portrait-avatar[data-reaction="slam"],.portrait-avatar[data-reaction="coffee"]{animation:none}

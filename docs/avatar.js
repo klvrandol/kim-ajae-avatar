@@ -17,7 +17,7 @@ export const reactionNames = {
   facepalm: "얼굴 가리기",
 };
 export const unavailableReactions = new Set(
-  Object.keys(reactionNames).filter((key) => key !== "slam"),
+  Object.keys(reactionNames).filter((key) => !["slam", "coffee"].includes(key)),
 );
 // Existing facial textures remain in their source coordinates. These affine maps
 // register each small region to the seated original, without touching hands or props.
@@ -37,6 +37,14 @@ export const avatarFrame = { width: 1448, height: 1448, portraitX: 181 };
 // 1145 * 1.32 - 111.4 = 1400: retain the same desk baseline on both poses.
 export const slamPlacement = { x: -340, y: -111.4, scale: 1.32 };
 export const SLAM_DURATION_MS = 1200;
+// Ignore the transparent bottom padding: opaque desk edge is source y=1376.
+// 1376 * 1.02 - 3.52 = 1400, with the head centre aligned to x=716.
+export const coffeePlacement = { x: 154, y: -3.52, scale: 1.02 };
+export const COFFEE_DURATION_MS = 2000;
+const reactionDurations = {
+  slam: SLAM_DURATION_MS,
+  coffee: COFFEE_DURATION_MS,
+};
 const regions = {
   mouth: {
     rect: [411, 600, 213, 145],
@@ -130,6 +138,7 @@ export function createAvatar(mount) {
   const ctx = canvas.getContext("2d", { alpha: true });
   let original,
     slam,
+    coffee,
     talk,
     expression = "neutral",
     mouth = 0,
@@ -138,7 +147,9 @@ export function createAvatar(mount) {
     blinkTimer,
     reactionTimer,
     reacting = false,
-    lastReactionAt = null;
+    activeReaction = null,
+    assetsReady = false,
+    lastReactionToken = null;
   const faces = new Map(),
     patches = new Map();
   function patch(image, key, small = false) {
@@ -197,14 +208,17 @@ export function createAvatar(mount) {
   function draw() {
     if (!original || disposed) return;
     ctx.clearRect(0, 0, avatarFrame.width, H);
-    canvas.dataset.reaction = reacting ? "slam" : "";
-    if (reacting && slam) {
+    canvas.dataset.reaction = reacting ? activeReaction : "";
+    const reactionImage = activeReaction === "coffee" ? coffee : slam;
+    if (reacting && reactionImage) {
+      const placement =
+        activeReaction === "coffee" ? coffeePlacement : slamPlacement;
       ctx.drawImage(
-        slam,
-        slamPlacement.x,
-        slamPlacement.y,
-        slam.naturalWidth * slamPlacement.scale,
-        slam.naturalHeight * slamPlacement.scale,
+        reactionImage,
+        placement.x,
+        placement.y,
+        reactionImage.naturalWidth * placement.scale,
+        reactionImage.naturalHeight * placement.scale,
       );
       canvas.dataset.mouth = "paused";
       canvas.dataset.blink = "false";
@@ -254,24 +268,36 @@ export function createAvatar(mount) {
     canvas.dispatchEvent(
       new CustomEvent("avatar-reactionchange", {
         bubbles: true,
-        detail: { active: reacting },
+        detail: { active: reacting, key: activeReaction },
       }),
     );
   }
-  function startSlam(at) {
-    if (!Number.isFinite(at) || at === lastReactionAt) return;
-    lastReactionAt = at;
-    const remaining = SLAM_DURATION_MS - (Date.now() - at);
-    if (remaining <= 0 || remaining > SLAM_DURATION_MS) return;
+  function acceptsReaction(key) {
+    return (
+      assetsReady &&
+      !unavailableReactions.has(key) &&
+      (!reacting || (activeReaction === "slam" && key === "slam"))
+    );
+  }
+  function startReaction(key, at) {
+    const token = key + ":" + at;
+    if (!Number.isFinite(at) || token === lastReactionToken) return;
+    // Mark ignored input as seen too, so mic messages cannot queue it for later.
+    lastReactionToken = token;
+    const remaining = reactionDurations[key] - (Date.now() - at);
+    if (remaining <= 0 || remaining > reactionDurations[key]) return;
+    if (reacting && (activeReaction === "coffee" || key === "coffee")) return;
     clearTimeout(reactionTimer);
     clearTimeout(blinkTimer);
     blink = false;
     reacting = true;
+    activeReaction = key;
     draw();
     notifyReaction();
     reactionTimer = setTimeout(() => {
       if (disposed) return;
       reacting = false;
+      activeReaction = null;
       draw();
       scheduleBlink();
       notifyReaction();
@@ -293,6 +319,9 @@ export function createAvatar(mount) {
   );
   const ready = Promise.all([
     ...expressionLoads,
+    loadImage("kim-ajae-coffee.png").then((image) => {
+      coffee = image;
+    }),
     loadImage("kim-ajae-keyboard-slam.png").then((image) => {
       slam = image;
     }),
@@ -305,6 +334,7 @@ export function createAvatar(mount) {
     }),
   ])
     .then(() => {
+      assetsReady = true;
       canvas.dataset.ready = "true";
       draw();
       if (!reacting) scheduleBlink();
@@ -318,6 +348,7 @@ export function createAvatar(mount) {
 
   return {
     ready,
+    canStartReaction: acceptsReaction,
     get isReacting() {
       return reacting;
     },
@@ -326,7 +357,8 @@ export function createAvatar(mount) {
         expression =
           state.expression in expressionNames ? state.expression : "neutral";
       mouth = Math.max(0, Math.min(2, Math.round(state.mouth || 0)));
-      if (state.reaction === "slam") startSlam(state.reactionAt);
+      if (Object.hasOwn(reactionDurations, state.reaction))
+        startReaction(state.reaction, state.reactionAt);
       draw();
     },
     dispose() {

@@ -3,7 +3,7 @@ import {
   expressionNames,
   reactionNames,
   unavailableReactions,
-} from "./avatar.js?pose=slam-v2";
+} from "./avatar.js?pose=coffee-v1";
 import { mouthFromLevel, createMouthTracker } from "./audio.js";
 const $ = (s) => document.querySelector(s);
 const staticMode = window.KIM_AJAE_STATIC === true;
@@ -54,6 +54,10 @@ document.addEventListener("avatar-reactionchange", (event) => {
   document
     .querySelectorAll("button[data-expression]")
     .forEach((b) => (b.disabled = event.detail.active));
+  document.querySelectorAll("button[data-reaction]").forEach((b) => {
+    if (!unavailableReactions.has(b.dataset.reaction))
+      b.disabled = !avatar.canStartReaction(b.dataset.reaction);
+  });
 });
 receive(state);
 // Stop stale lip movements when a controller closes or disconnects.
@@ -64,7 +68,10 @@ setInterval(() => {
   }
 }, 300);
 async function send(patch) {
-  if (patch.reaction === "slam") await avatar.ready;
+  if (["slam", "coffee"].includes(patch.reaction)) {
+    await avatar.ready;
+    if (!avatar.canStartReaction(patch.reaction)) return;
+  }
   if (patch.expression && avatar.isReacting) return;
   if (staticMode) {
     const next = { ...state, ...patch };
@@ -100,10 +107,14 @@ if (!overlay || staticMode) {
     button.title =
       key === "slam"
         ? "키보드 슬램 (Q) · 1.2초 후 자동 복귀"
-        : "원본 스타일의 팔·소품 파츠가 필요합니다";
-    if (key === "slam") {
+        : key === "coffee"
+          ? "커피 마시기 (W) · 2초 후 자동 복귀"
+          : "원본 스타일의 팔·소품 파츠가 필요합니다";
+    if (["slam", "coffee"].includes(key)) {
       button.disabled = true;
-      avatar.ready.then(() => (button.disabled = false)).catch(() => {});
+      avatar.ready
+        .then(() => (button.disabled = !avatar.canStartReaction(key)))
+        .catch(() => {});
     }
     button.onclick = () => send({ reaction: key }).catch(report);
     $("#reactions").append(button);
@@ -121,9 +132,9 @@ if (!overlay || staticMode) {
     if (index >= 0 && index < 8)
       send({ expression: Object.keys(expressionNames)[index] }).catch(report);
     const r = keys.indexOf(e.key.toLowerCase());
-    if (r === 0) {
+    if (r === 0 || r === 1) {
       e.preventDefault();
-      send({ reaction: "slam" }).catch(report);
+      send({ reaction: r === 0 ? "slam" : "coffee" }).catch(report);
     } else if (r > 0)
       toast("이 리액션은 원본 스타일의 팔·소품 이미지가 필요합니다.");
   });
@@ -311,7 +322,7 @@ if (!overlay || staticMode) {
     $(".session").firstChild.textContent = "";
     $(".session").innerHTML = "<i></i> BROWSER TEST <b>Pages</b>";
     $("#guide").innerHTML =
-      `<summary>GitHub Pages · OBS 연결 안내</summary><ol><li>마이크 켜기를 누르고 브라우저 권한을 허용하세요. 별도 설치 없이 이 화면에서 테스트할 수 있습니다.</li><li>투명 화면 열기: 같은 브라우저의 팝업에는 음량과 표정이 전달됩니다. 패널은 하나만 열어 두세요.</li><li>OBS 브라우저 소스 URL: <code>${sourceUrl}</code> 크기 800×800. OBS의 ‘상호작용’에서 마이크 켜기를 누르고 허용한 뒤 ‘조작 숨기기’를 누르세요. H 키로 조작을 다시 표시합니다.</li><li>OBS는 일반 브라우저와 별도 프로세스여서 패널의 음량/표정이 직접 전달되지 않습니다. OBS 화면에서 직접 조작하세요. OBS 버전에 따라 마이크 권한이 지원되지 않으면 Chrome 투명 화면의 윈도우 캡처 또는 기존 로컬 서버 모드를 사용하세요.</li></ol><p>단축키: 표정 1–8, 키보드 슬램 Q, 나머지 리액션은 추가 파츠 준비 중 (표정 단축키는 해당 화면에 포커스 필요). 소리는 녹음·업로드하지 않습니다. 투명 모드에서 캡처하기 전에 조작 UI를 숨기세요.</p>`;
+      `<summary>GitHub Pages · OBS 연결 안내</summary><ol><li>마이크 켜기를 누르고 브라우저 권한을 허용하세요. 별도 설치 없이 이 화면에서 테스트할 수 있습니다.</li><li>투명 화면 열기: 같은 브라우저의 팝업에는 음량과 표정이 전달됩니다. 패널은 하나만 열어 두세요.</li><li>OBS 브라우저 소스 URL: <code>${sourceUrl}</code> 크기 800×800. OBS의 ‘상호작용’에서 마이크 켜기를 누르고 허용한 뒤 ‘조작 숨기기’를 누르세요. H 키로 조작을 다시 표시합니다.</li><li>OBS는 일반 브라우저와 별도 프로세스여서 패널의 음량/표정이 직접 전달되지 않습니다. OBS 화면에서 직접 조작하세요. OBS 버전에 따라 마이크 권한이 지원되지 않으면 Chrome 투명 화면의 윈도우 캡처 또는 기존 로컬 서버 모드를 사용하세요.</li></ol><p>단축키: 표정 1–8, 키보드 슬램 Q / 커피 W, 나머지 리액션은 추가 파츠 준비 중 (표정 단축키는 해당 화면에 포커스 필요). 소리는 녹음·업로드하지 않습니다. 투명 모드에서 캡처하기 전에 조작 UI를 숨기세요.</p>`;
     if (overlay) {
       const toolbar = document.createElement("div");
       toolbar.id = "overlay-tools";
@@ -333,10 +344,16 @@ if (!overlay || staticMode) {
         b.disabled = unavailableReactions.has(key);
         b.dataset.reaction = key;
         b.title =
-          key === "slam" ? "Q · 1.2초 후 자동 복귀" : "추가 원본 파츠 필요";
-        if (key === "slam") {
+          key === "slam"
+            ? "Q · 1.2초 후 자동 복귀"
+            : key === "coffee"
+              ? "W · 2초 후 자동 복귀"
+              : "추가 원본 파츠 필요";
+        if (["slam", "coffee"].includes(key)) {
           b.disabled = true;
-          avatar.ready.then(() => (b.disabled = false)).catch(() => {});
+          avatar.ready
+            .then(() => (b.disabled = !avatar.canStartReaction(key)))
+            .catch(() => {});
         }
         b.onclick = () => send({ reaction: key });
         $("#overlay-reactions").append(b);
