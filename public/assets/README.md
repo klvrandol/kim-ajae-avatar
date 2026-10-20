@@ -12,4 +12,10 @@ Existing facial textures below are retained. `seatedFaceRegistration` in `public
 
 The default neutral canvas is now drawn directly from the seated original. Generated face textures are **derived artwork**, not claims of exact pixel identity. Registration and feathered masks are defined in `public/avatar.js`. The rig never replaces the original head, glasses, nose, beard outline, gray tracksuit, seated arms or desk props with generated versions. The small mouth stage compresses only the mouth texture; it does not stretch the whole face.
 
-No separate arm or prop art has been supplied. All five special reaction buttons remain present but disabled. To enable them faithfully, supply transparent source layers with a clean torso and desk behind the seated arms, separate left/right arms and hands, plus keyboard/slam hands, cup/drinking hand, gamepad/gripping hands, raised arms, and face-covering hand. Use the same 1086×1448 registration or document matching anchors.
+The uploaded full keyboard slam pose is available and enabled. The other four reaction buttons remain disabled. To enable those faithfully, supply transparent source layers with a clean torso and desk behind the seated arms, separate left/right arms and hands, plus cup/drinking hand, gamepad/gripping hands, raised arms, and face-covering hand. Use the same 1086×1448 registration or document matching anchors.
+
+## Keyboard slam
+
+`kim-ajae-keyboard-slam.png` is a byte-identical copy of the user upload at repository root (1374×1145 RGBA). No generated or replacement art is used. A shared 1448×1448 transparent frame holds the seated portrait at x=181 and the complete slam texture at x=3, y=197.75, uniform scale 1.05. The slam desk bottom is anchored to y=1400; the full image fits inside the frame. CSS preserves the prior seated portrait's visible size. The leaning head and punching arm motion belong to the uploaded pose itself.
+
+During the 1200ms reaction, facial patches and blink rendering are suspended. The microphone continues analysing so the current mouth stage can resume on return. The selected expression is held and buttons are temporarily disabled. A new trigger restarts the duration; repeated state broadcasts do not. Expired reaction timestamps do not replay on reconnect. Coffee/gamepad/cheer/facepalm still need separate approved art.

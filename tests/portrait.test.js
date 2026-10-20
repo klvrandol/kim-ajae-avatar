@@ -50,3 +50,11 @@ test("mouth tracker resists threshold chatter and closes after sustained quiet",
   assert.equal(sample(0, 421), 0);
   assert.equal(sample(0, 540), 0);
 });
+test("uploaded slam PNG is preserved in runtime and Pages assets", async () => {
+  const source = await readFile(new URL("kim-ajae-keyboard-slam.png", root));
+  assert.equal(source.readUInt32BE(16), 1374);
+  assert.equal(source.readUInt32BE(20), 1145);
+  assert.equal(source[25], 6);
+  for (const path of ["public/assets/kim-ajae-keyboard-slam.png", "docs/assets/kim-ajae-keyboard-slam.png"])
+    assert.equal(digest(await readFile(new URL(path, root))), digest(source));
+});

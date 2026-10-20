@@ -16,7 +16,9 @@ export const reactionNames = {
   cheer: "환호",
   facepalm: "얼굴 가리기",
 };
-export const unavailableReactions = new Set(Object.keys(reactionNames));
+export const unavailableReactions = new Set(
+  Object.keys(reactionNames).filter((key) => key !== "slam"),
+);
 // Existing facial textures remain in their source coordinates. These affine maps
 // register each small region to the seated original, without touching hands or props.
 export const seatedFaceRegistration = {
@@ -29,6 +31,10 @@ export const seatedFaceRegistration = {
 };
 const W = 1086,
   H = 1448;
+// A shared square frame adds transparent side margins without shrinking the portrait.
+export const avatarFrame = { width: 1448, height: 1448, portraitX: 181 };
+export const slamPlacement = { x: 3, y: 197.75, scale: 1.05 };
+export const SLAM_DURATION_MS = 1200;
 const regions = {
   mouth: {
     rect: [411, 600, 213, 145],
@@ -110,7 +116,7 @@ function loadImage(name) {
 }
 export function createAvatar(mount) {
   const canvas = document.createElement("canvas");
-  canvas.width = W;
+  canvas.width = avatarFrame.width;
   canvas.height = H;
   canvas.className = "avatar portrait-avatar";
   canvas.setAttribute("role", "img");
@@ -121,12 +127,16 @@ export function createAvatar(mount) {
   mount.replaceChildren(canvas);
   const ctx = canvas.getContext("2d", { alpha: true });
   let original,
+    slam,
     talk,
     expression = "neutral",
     mouth = 0,
     blink = false,
     disposed = false,
-    blinkTimer;
+    blinkTimer,
+    reactionTimer,
+    reacting = false,
+    lastReactionAt = null;
   const faces = new Map(),
     patches = new Map();
   function patch(image, key, small = false) {
@@ -177,14 +187,28 @@ export function createAvatar(mount) {
   function drawPatch(image, key, small = false) {
     const [x, y] = regions[key].rect;
     ctx.save();
+    ctx.translate(avatarFrame.portraitX, 0);
     ctx.transform(...seatedFaceRegistration[key]);
     ctx.drawImage(patch(image, key, small), x, y);
     ctx.restore();
   }
   function draw() {
     if (!original || disposed) return;
-    ctx.clearRect(0, 0, W, H);
-    ctx.drawImage(original, 0, 0, W, H);
+    ctx.clearRect(0, 0, avatarFrame.width, H);
+    canvas.dataset.reaction = reacting ? "slam" : "";
+    if (reacting && slam) {
+      ctx.drawImage(
+        slam,
+        slamPlacement.x,
+        slamPlacement.y,
+        slam.naturalWidth * slamPlacement.scale,
+        slam.naturalHeight * slamPlacement.scale,
+      );
+      canvas.dataset.mouth = "paused";
+      canvas.dataset.blink = "false";
+      return;
+    }
+    ctx.drawImage(original, avatarFrame.portraitX, 0, W, H);
     const face = faces.get(expression);
     if (face) {
       for (const key of [
@@ -212,7 +236,7 @@ export function createAvatar(mount) {
   function scheduleBlink() {
     blinkTimer = setTimeout(
       () => {
-        if (disposed) return;
+        if (disposed || reacting) return;
         blink = true;
         draw();
         blinkTimer = setTimeout(() => {
@@ -223,6 +247,33 @@ export function createAvatar(mount) {
       },
       3300 + Math.random() * 3500,
     );
+  }
+  function notifyReaction() {
+    canvas.dispatchEvent(
+      new CustomEvent("avatar-reactionchange", {
+        bubbles: true,
+        detail: { active: reacting },
+      }),
+    );
+  }
+  function startSlam(at) {
+    if (!Number.isFinite(at) || at === lastReactionAt) return;
+    lastReactionAt = at;
+    const remaining = SLAM_DURATION_MS - (Date.now() - at);
+    if (remaining <= 0 || remaining > SLAM_DURATION_MS) return;
+    clearTimeout(reactionTimer);
+    clearTimeout(blinkTimer);
+    blink = false;
+    reacting = true;
+    draw();
+    notifyReaction();
+    reactionTimer = setTimeout(() => {
+      if (disposed) return;
+      reacting = false;
+      draw();
+      scheduleBlink();
+      notifyReaction();
+    }, remaining);
   }
   const expressionLoads = [
     "laugh",
@@ -240,6 +291,9 @@ export function createAvatar(mount) {
   );
   const ready = Promise.all([
     ...expressionLoads,
+    loadImage("kim-ajae-keyboard-slam.png").then((image) => {
+      slam = image;
+    }),
     loadImage("kim-ajae-seated-original.png").then((image) => {
       original = image;
       draw();
@@ -251,7 +305,7 @@ export function createAvatar(mount) {
     .then(() => {
       canvas.dataset.ready = "true";
       draw();
-      scheduleBlink();
+      if (!reacting) scheduleBlink();
     })
     .catch((error) => {
       mount.dataset.error = error.message;
@@ -262,15 +316,21 @@ export function createAvatar(mount) {
 
   return {
     ready,
+    get isReacting() {
+      return reacting;
+    },
     update(state) {
-      expression =
-        state.expression in expressionNames ? state.expression : "neutral";
+      if (!reacting)
+        expression =
+          state.expression in expressionNames ? state.expression : "neutral";
       mouth = Math.max(0, Math.min(2, Math.round(state.mouth || 0)));
+      if (state.reaction === "slam") startSlam(state.reactionAt);
       draw();
     },
     dispose() {
       disposed = true;
       clearTimeout(blinkTimer);
+      clearTimeout(reactionTimer);
     },
   };
 }
