@@ -33,7 +33,9 @@ const W = 1086,
   H = 1448;
 // A shared square frame adds transparent side margins without shrinking the portrait.
 export const avatarFrame = { width: 1448, height: 1448, portraitX: 181 };
-export const slamPlacement = { x: 3, y: 197.75, scale: 1.05 };
+// Match the head centre/height to the seated portrait, not the full PNG bounds.
+// 1145 * 1.32 - 111.4 = 1400: retain the same desk baseline on both poses.
+export const slamPlacement = { x: -340, y: -111.4, scale: 1.32 };
 export const SLAM_DURATION_MS = 1200;
 const regions = {
   mouth: {

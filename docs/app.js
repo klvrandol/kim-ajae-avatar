@@ -3,7 +3,7 @@ import {
   expressionNames,
   reactionNames,
   unavailableReactions,
-} from "./avatar.js?pose=slam-v1";
+} from "./avatar.js?pose=slam-v2";
 import { mouthFromLevel, createMouthTracker } from "./audio.js";
 const $ = (s) => document.querySelector(s);
 const staticMode = window.KIM_AJAE_STATIC === true;
